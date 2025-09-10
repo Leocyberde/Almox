@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Aprovar Solicitação - Sistema de Controle de Estoque{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-gavel"></i> Analisar Solicitação</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('pending_requests') }}">Solicitações Pendentes</a></li>
+                <li class="breadcrumb-item active">Analisar #{{ allocation.id }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-file-alt"></i> Detalhes da Solicitação #{{ allocation.id }}</h5>
+            </div>
+            <div class="card-body">
+                <!-- Product Information -->
+                <div class="row mb-4">
+                    <div class="col-md-2">
+                        {% if allocation.product.photo_filename %}
+                            <img src="{{ url_for('uploaded_file', filename=allocation.product.photo_filename) }}" 
+                                 alt="Foto do produto" 
+                                 class="img-thumbnail product-photo" 
+                                 style="width: 100%; height: 120px; object-fit: cover; cursor: pointer;"
+                                 onclick="showProductPhoto('{{ allocation.product.photo_filename }}', '{{ allocation.product.code }}', '{{ allocation.product.name }}')"
+                                 title="Clique para ampliar">
+                        {% else %}
+                            <div class="d-flex align-items-center justify-content-center bg-secondary text-white rounded" 
+                                 style="width: 100%; height: 120px; font-size: 36px;">
+                                <i class="fas fa-box"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-10">
+                        <h4>{{ allocation.product.code }} - {{ allocation.product.name }}</h4>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Fornecedor:</strong> {{ allocation.product.supplier_name }}</p>
+                                <p class="mb-2"><strong>Referência:</strong> {{ allocation.product.supplier_reference or '-' }}</p>
+                                <p class="mb-2"><strong>Local:</strong> {{ allocation.product.location }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Estoque Atual:</strong> 
+                                    <span class="badge bg-{% if allocation.product.quantity >= allocation.quantity %}success{% else %}danger{% endif %} fs-6">
+                                        {{ allocation.product.quantity|int }} {{ allocation.product.unit }}
+                                    </span>
+                                </p>
+                                <p class="mb-2"><strong>Quantidade Solicitada:</strong> 
+                                    <span class="badge bg-primary fs-6">{{ allocation.quantity|int }} {{ allocation.product.unit }}</span>
+                                </p>
+                                {% if allocation.product.quantity < allocation.quantity %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <strong>Atenção:</strong> Estoque insuficiente para esta solicitação!
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Request Information -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6>Informações da Solicitação</h6>
+                        <p class="mb-2"><strong>Solicitante:</strong> {{ allocation.user.username }}</p>
+                        <p class="mb-2"><strong>Função:</strong> {{ allocation.user.role|title }}</p>
+                        <p class="mb-2"><strong>Obra:</strong> <span class="badge bg-info">{{ allocation.work_number }}</span></p>
+                        <p class="mb-2"><strong>Data:</strong> {{ allocation.allocated_at.strftime('%d/%m/%Y às %H:%M') }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Observações da Solicitação</h6>
+                        {% if allocation.notes %}
+                        <div class="alert alert-info">
+                            {{ allocation.notes }}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">Nenhuma observação fornecida.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Approval Form -->
+                <hr>
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.action.label(class="form-label") }}
+                            {{ form.action(class="form-select" + (" is-invalid" if form.action.errors else "")) }}
+                            {% if form.action.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.action.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.approval_notes.label(class="form-label") }}
+                        {{ form.approval_notes(class="form-control", rows="3", placeholder="Adicione observações sobre sua decisão (opcional)...") }}
+                        {% if form.approval_notes.errors %}
+                            <div class="text-danger">
+                                {% for error in form.approval_notes.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-gavel"></i> Processar Solicitação
+                        </button>
+                        <a href="{{ url_for('pending_requests') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Guia de Aprovação</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-check-circle"></i> Aprovação</h6>
+                    <p class="mb-2">Aprove quando:</p>
+                    <ul class="mb-0">
+                        <li>Há estoque suficiente</li>
+                        <li>A solicitação é justificada</li>
+                        <li>A obra é válida</li>
+                        <li>A quantidade é razoável</li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-times-circle"></i> Rejeição</h6>
+                    <p class="mb-2">Rejeite quando:</p>
+                    <ul class="mb-0">
+                        <li>Estoque insuficiente</li>
+                        <li>Quantidade excessiva</li>
+                        <li>Falta de justificativa</li>
+                        <li>Obra inválida</li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-lightbulb"></i> Dica</h6>
+                    <p class="mb-0">Se aprovada, o estoque será automaticamente reduzido e o produto será alocado para a obra especificada.</p>
+                </div>
+
+                <!-- Recent requests from this user -->
+                <div class="mt-4">
+                    <h6>Histórico do Solicitante</h6>
+                    <div class="small">
+                        {% set recent_requests = allocation.user.allocations[-5:] %}
+                        {% for req in recent_requests %}
+                            {% if req.id != allocation.id %}
+                            <div class="d-flex justify-content-between border-bottom py-1">
+                                <span>{{ req.product.code }}</span>
+                                <span class="badge bg-{% if req.status == 'approved' %}success{% elif req.status == 'rejected' %}danger{% else %}warning{% endif %} badge-sm">
+                                    {{ req.status|title }}
+                                </span>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                        {% if recent_requests|length <= 1 %}
+                        <p class="text-muted">Primeira solicitação do usuário.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Change form styling based on action selection
+document.getElementById('action').addEventListener('change', function() {
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const action = this.value;
+    
+    if (action === 'approved') {
+        submitBtn.className = 'btn btn-success';
+        submitBtn.innerHTML = '<i class="fas fa-check"></i> Aprovar Solicitação';
+    } else if (action === 'rejected') {
+        submitBtn.className = 'btn btn-danger';
+        submitBtn.innerHTML = '<i class="fas fa-times"></i> Rejeitar Solicitação';
+    } else {
+        submitBtn.className = 'btn btn-primary';
+        submitBtn.innerHTML = '<i class="fas fa-gavel"></i> Processar Solicitação';
+    }
+});
+</script>
+{% endblock %}

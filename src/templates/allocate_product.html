@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Alocar Produto - Sistema de Controle de Estoque{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-share"></i> Alocar Produto</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Alocar Produto</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-box"></i> Informações da Alocação</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="allocationForm">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.product_search.label(class="form-label") }}
+                        <div class="position-relative">
+                            {{ form.product_search(class="form-control" + (" is-invalid" if form.product_search.errors else ""), id="productSearch", autocomplete="off") }}
+                            <div id="searchResults" class="position-absolute w-100 bg-white border border-top-0 rounded-bottom" style="z-index: 1000; max-height: 300px; overflow-y: auto; display: none;"></div>
+                        </div>
+                        {% if form.product_search.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.product_search.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">Digite o nome, código ou referência do produto para buscar.</div>
+                        
+                        {{ form.product_id() }}
+                        {% if form.product_id.errors %}
+                            <div class="text-danger">
+                                {% for error in form.product_id.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div id="productInfo" class="alert alert-info" style="display: none;">
+                        <h6>Produto Selecionado:</h6>
+                        <div id="productDetails"></div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.work_number.label(class="form-label") }}
+                            {{ form.work_number(class="form-control" + (" is-invalid" if form.work_number.errors else "")) }}
+                            {% if form.work_number.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.work_number.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            {{ form.quantity.label(class="form-label") }}
+                            {{ form.quantity(class="form-control" + (" is-invalid" if form.quantity.errors else ""), id="quantityInput") }}
+                            {% if form.quantity.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.quantity.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div id="stockInfo" class="form-text"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control", rows="3") }}
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                            <i class="fas fa-share"></i> Alocar Produto
+                        </button>
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Como Alocar</h5>
+            </div>
+            <div class="card-body">
+                <ol class="small">
+                    <li>Digite parte do nome, código ou referência do produto</li>
+                    <li>Selecione o produto desejado na lista</li>
+                    <li>Digite o número da obra destino</li>
+                    <li>Informe a quantidade a alocar</li>
+                    <li>Adicione observações se necessário</li>
+                    <li>Clique em "Alocar Produto"</li>
+                </ol>
+                
+                <hr>
+                
+                <h6>Dicas:</h6>
+                <ul class="small text-muted">
+                    <li>A busca funciona com qualquer parte do nome</li>
+                    <li>Você pode buscar por código do produto</li>
+                    <li>A quantidade disponível será mostrada</li>
+                    <li>Apenas produtos com estoque podem ser alocados</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedProduct = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('productSearch');
+    const searchResults = document.getElementById('searchResults');
+    const productIdInput = document.getElementById('product_id');
+    const productInfo = document.getElementById('productInfo');
+    const productDetails = document.getElementById('productDetails');
+    const quantityInput = document.getElementById('quantityInput');
+    const stockInfo = document.getElementById('stockInfo');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if (query.length < 2) {
+            searchResults.style.display = 'none';
+            clearSelection();
+            return;
+        }
+        
+        searchTimeout = setTimeout(() => {
+            fetch(`/api/products/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(products => {
+                    displaySearchResults(products);
+                })
+                .catch(error => {
+                    console.error('Erro na busca:', error);
+                    searchResults.style.display = 'none';
+                });
+        }, 300);
+    });
+    
+    function displaySearchResults(products) {
+        if (products.length === 0) {
+            searchResults.innerHTML = '<div class="p-2 text-muted">Nenhum produto encontrado</div>';
+            searchResults.style.display = 'block';
+            return;
+        }
+        
+        const resultsHtml = products.map(product => `
+            <div class="search-result-item p-2 border-bottom" style="cursor: pointer; background-color: var(--bs-body-bg); border-color: var(--custom-border-color);" data-product='${JSON.stringify(product)}'>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        ${product.photo_filename ? 
+                            `<div class="me-3">
+                                <img src="/uploads/${product.photo_filename}" 
+                                     alt="Foto do produto" 
+                                     class="img-thumbnail product-photo" 
+                                     style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;"
+                                     onclick="event.stopPropagation(); showProductPhoto('${product.photo_filename}', '${product.code}', '${product.name}')"
+                                     title="Clique para ampliar">
+                            </div>` : 
+                            `<div class="me-3">
+                                <div class="d-flex align-items-center justify-content-center bg-secondary text-white rounded" 
+                                     style="width: 50px; height: 50px; font-size: 20px;">
+                                    <i class="fas fa-box"></i>
+                                </div>
+                            </div>`
+                        }
+                        <div>
+                            <strong style="color: var(--bs-primary);">${product.code}</strong> - <span style="color: var(--bs-body-color);">${product.name}</span>
+                            <br><small class="text-muted">
+                                ${product.supplier_reference ? product.supplier_reference + ' - ' : ''}
+                                ${product.supplier_name} | Local: ${product.location}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-${product.quantity > 0 ? 'success' : 'danger'}">
+                            ${product.quantity} ${product.unit}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        searchResults.innerHTML = resultsHtml;
+        searchResults.style.display = 'block';
+        
+        // Add click handlers
+        searchResults.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const product = JSON.parse(this.dataset.product);
+                selectProduct(product);
+            });
+        });
+    }
+    
+    function selectProduct(product) {
+        selectedProduct = product;
+        
+        searchInput.value = `${product.code} - ${product.name}`;
+        productIdInput.value = product.id;
+        
+        productDetails.innerHTML = `
+            <div class="d-flex align-items-start">
+                ${product.photo_filename ? 
+                    `<div class="me-3">
+                        <img src="/uploads/${product.photo_filename}" 
+                             alt="Foto do produto" 
+                             class="img-thumbnail product-photo" 
+                             style="width: 80px; height: 80px; object-fit: cover; cursor: pointer;"
+                             onclick="showProductPhoto('${product.photo_filename}', '${product.code}', '${product.name}')"
+                             title="Clique para ampliar">
+                    </div>` : ''
+                }
+                <div class="flex-grow-1">
+                    <strong>${product.code}</strong> - ${product.name}<br>
+                    <small>Fornecedor: ${product.supplier_name} | Local: ${product.location}</small><br>
+                    <span class="badge bg-${product.quantity > 0 ? 'success' : 'danger'}">
+                        Estoque: ${product.quantity} ${product.unit}
+                    </span>
+                </div>
+            </div>
+        `;
+        
+        productInfo.style.display = 'block';
+        searchResults.style.display = 'none';
+        
+        updateStockInfo();
+        updateSubmitButton();
+    }
+    
+    function clearSelection() {
+        selectedProduct = null;
+        productIdInput.value = '';
+        productInfo.style.display = 'none';
+        stockInfo.textContent = '';
+        updateSubmitButton();
+    }
+    
+    function updateStockInfo() {
+        if (!selectedProduct) return;
+        
+        const currentQuantity = parseFloat(quantityInput.value) || 0;
+        const available = selectedProduct.quantity;
+        
+        if (currentQuantity > available) {
+            stockInfo.textContent = `⚠️ Quantidade indisponível! Estoque: ${available} ${selectedProduct.unit}`;
+            stockInfo.className = 'form-text text-danger';
+        } else if (currentQuantity > 0) {
+            stockInfo.textContent = `✓ Disponível. Estoque atual: ${available} ${selectedProduct.unit}`;
+            stockInfo.className = 'form-text text-success';
+        } else {
+            stockInfo.textContent = `Estoque disponível: ${available} ${selectedProduct.unit}`;
+            stockInfo.className = 'form-text';
+        }
+    }
+    
+    function updateSubmitButton() {
+        const hasProduct = selectedProduct && selectedProduct.id;
+        const hasWorkNumber = document.getElementById('work_number').value.trim().length > 0;
+        const quantity = parseFloat(quantityInput.value) || 0;
+        const hasValidQuantity = quantity > 0 && (!selectedProduct || quantity <= selectedProduct.quantity);
+        
+        submitBtn.disabled = !(hasProduct && hasWorkNumber && hasValidQuantity);
+    }
+    
+    quantityInput.addEventListener('input', function() {
+        updateStockInfo();
+        updateSubmitButton();
+    });
+    
+    document.getElementById('work_number').addEventListener('input', updateSubmitButton);
+    
+    // Hide search results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %}

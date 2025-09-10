@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block title %}Solicitar Produto - Sistema de Controle de Estoque{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-plus-circle"></i> Solicitar Produto</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Solicitar Produto</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-file-alt"></i> Nova Solicitação</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" autocomplete="off">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.product_search.label(class="form-label") }}
+                        <div class="input-group">
+                            {{ form.product_search(class="form-control", placeholder="Digite o código ou nome do produto...", autocomplete="off") }}
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearSelection()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        {% if form.product_search.errors %}
+                            <div class="text-danger">
+                                {% for error in form.product_search.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Search results will appear here -->
+                        <div id="searchResults" class="search-results mt-2"></div>
+                        {{ form.product_id }}
+                    </div>
+                    
+                    <!-- Product information will appear here -->
+                    <div id="productInfo" class="mb-3" style="display: none;">
+                        <div class="alert alert-info">
+                            <strong>Produto Selecionado:</strong>
+                            <div id="productDetails"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.work_number.label(class="form-label") }}
+                            {{ form.work_number(class="form-control" + (" is-invalid" if form.work_number.errors else "")) }}
+                            {% if form.work_number.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.work_number.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            {{ form.quantity.label(class="form-label") }}
+                            {{ form.quantity(class="form-control", min="0.01", step="0.01", onchange="updateStockInfo()") }}
+                            {% if form.quantity.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.quantity.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div id="stockInfo" class="form-text"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control", rows="3", placeholder="Descreva o motivo da solicitação e detalhes adicionais...") }}
+                        {% if form.notes.errors %}
+                            <div class="text-danger">
+                                {% for error in form.notes.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" id="submitBtn" class="btn btn-primary" disabled>
+                            <i class="fas fa-paper-plane"></i> Enviar Solicitação
+                        </button>
+                        <a href="{{ url_for('dashboard_producao') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Informações</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <h6><i class="fas fa-exclamation-triangle"></i> Processo de Aprovação</h6>
+                    <p class="mb-2">Suas solicitações passarão por aprovação:</p>
+                    <ol class="mb-0">
+                        <li>Você envia a solicitação</li>
+                        <li>Almoxarifado analisa e aprova/rejeita</li>
+                        <li>Se aprovada, o produto é alocado automaticamente</li>
+                    </ol>
+                </div>
+                
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-lightbulb"></i> Dicas</h6>
+                    <ul class="mb-0">
+                        <li>Seja específico na justificativa</li>
+                        <li>Solicite apenas a quantidade necessária</li>
+                        <li>Verifique se há estoque disponível</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedProduct = null;
+const searchInput = document.getElementById('product_search');
+const searchResults = document.getElementById('searchResults');
+const productIdInput = document.getElementById('product_id');
+const productInfo = document.getElementById('productInfo');
+const productDetails = document.getElementById('productDetails');
+const stockInfo = document.getElementById('stockInfo');
+const submitBtn = document.getElementById('submitBtn');
+const quantityInput = document.getElementById('quantity');
+
+// Initialize if product is preselected
+{% if selected_product %}
+selectedProduct = {{ selected_product|tojson }};
+updateStockInfo();
+updateSubmitButton();
+{% endif %}
+
+let searchTimeout;
+searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+    
+    if (query.length >= 2) {
+        searchTimeout = setTimeout(() => searchProducts(query), 300);
+    } else {
+        searchResults.style.display = 'none';
+    }
+});
+
+function searchProducts(query) {
+    fetch(`/api/products/search?q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => displaySearchResults(data))
+        .catch(error => console.error('Erro na busca:', error));
+}
+
+function displaySearchResults(products) {
+    if (products.length === 0) {
+        searchResults.innerHTML = '<div class="text-muted p-2">Nenhum produto encontrado</div>';
+        searchResults.style.display = 'block';
+        return;
+    }
+    
+    const resultsHtml = products.map(product => `
+        <div class="search-result-item p-2 border-bottom" style="cursor: pointer; background-color: var(--bs-body-bg); border-color: var(--custom-border-color);" data-product='${JSON.stringify(product)}'>
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    ${product.photo_filename ? 
+                        `<div class="me-3">
+                            <img src="/uploads/${product.photo_filename}" 
+                                 alt="Foto do produto" 
+                                 class="img-thumbnail product-photo" 
+                                 style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;"
+                                 onclick="event.stopPropagation(); showProductPhoto('${product.photo_filename}', '${product.code}', '${product.name}')"
+                                 title="Clique para ampliar">
+                        </div>` : 
+                        `<div class="me-3">
+                            <div class="d-flex align-items-center justify-content-center bg-secondary text-white rounded" 
+                                 style="width: 50px; height: 50px; font-size: 20px;">
+                                <i class="fas fa-box"></i>
+                            </div>
+                        </div>`
+                    }
+                    <div>
+                        <strong style="color: var(--bs-primary);">${product.code}</strong> - <span style="color: var(--bs-body-color);">${product.name}</span>
+                        <br><small class="text-muted">
+                            ${product.supplier_reference ? product.supplier_reference + ' - ' : ''}
+                            ${product.supplier_name} | ${product.location}
+                        </small>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-${product.quantity > 0 ? 'success' : 'danger'}">
+                        ${product.quantity} ${product.unit}
+                    </span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    searchResults.innerHTML = resultsHtml;
+    searchResults.style.display = 'block';
+    
+    // Add click handlers
+    searchResults.querySelectorAll('.search-result-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const product = JSON.parse(this.dataset.product);
+            selectProduct(product);
+        });
+    });
+}
+
+function selectProduct(product) {
+    selectedProduct = product;
+    
+    searchInput.value = `${product.code} - ${product.name}`;
+    productIdInput.value = product.id;
+    
+    productDetails.innerHTML = `
+        <div class="d-flex align-items-start">
+            ${product.photo_filename ? 
+                `<div class="me-3">
+                    <img src="/uploads/${product.photo_filename}" 
+                         alt="Foto do produto" 
+                         class="img-thumbnail product-photo" 
+                         style="width: 80px; height: 80px; object-fit: cover; cursor: pointer;"
+                         onclick="showProductPhoto('${product.photo_filename}', '${product.code}', '${product.name}')"
+                         title="Clique para ampliar">
+                </div>` : ''
+            }
+            <div class="flex-grow-1">
+                <strong>${product.code}</strong> - ${product.name}<br>
+                <small>Fornecedor: ${product.supplier_name} | Local: ${product.location}</small><br>
+                <span class="badge bg-${product.quantity > 0 ? 'success' : 'danger'}">
+                    Estoque: ${product.quantity} ${product.unit}
+                </span>
+            </div>
+        </div>
+    `;
+    
+    productInfo.style.display = 'block';
+    searchResults.style.display = 'none';
+    
+    updateStockInfo();
+    updateSubmitButton();
+}
+
+function clearSelection() {
+    selectedProduct = null;
+    productIdInput.value = '';
+    productInfo.style.display = 'none';
+    stockInfo.textContent = '';
+    updateSubmitButton();
+}
+
+function updateStockInfo() {
+    if (!selectedProduct) return;
+    
+    const currentQuantity = parseFloat(quantityInput.value) || 0;
+    const available = selectedProduct.quantity;
+    
+    if (currentQuantity > available) {
+        stockInfo.textContent = `⚠️ Quantidade solicitada excede estoque disponível! Estoque: ${available} ${selectedProduct.unit}`;
+        stockInfo.className = 'form-text text-warning';
+    } else if (currentQuantity > 0) {
+        stockInfo.textContent = `✓ Quantidade disponível. Estoque atual: ${available} ${selectedProduct.unit}`;
+        stockInfo.className = 'form-text text-success';
+    } else {
+        stockInfo.textContent = `Estoque disponível: ${available} ${selectedProduct.unit}`;
+        stockInfo.className = 'form-text text-muted';
+    }
+}
+
+function updateSubmitButton() {
+    if (selectedProduct && productIdInput.value) {
+        submitBtn.disabled = false;
+    } else {
+        submitBtn.disabled = true;
+    }
+}
+
+// Update submit button when quantity changes
+quantityInput.addEventListener('input', updateStockInfo);
+
+// Hide search results when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#searchResults') && !e.target.closest('#product_search')) {
+        searchResults.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

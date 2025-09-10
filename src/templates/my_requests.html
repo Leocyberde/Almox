@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Minhas Solicitações - Sistema de Controle de Estoque{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-list"></i> Minhas Solicitações</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Minhas Solicitações</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="text-muted">
+                    {% if allocations.total > 0 %}
+                        Mostrando {{ allocations.per_page * (allocations.page - 1) + 1 }} a 
+                        {{ allocations.per_page * (allocations.page - 1) + allocations.items|length }} 
+                        de {{ allocations.total }} solicitações
+                    {% endif %}
+                </span>
+            </div>
+            <div>
+                <a href="{{ url_for('request_product') }}" class="btn btn-primary">
+                    <i class="fas fa-plus-circle"></i> Nova Solicitação
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-file-alt"></i> Histórico de Solicitações</h5>
+            </div>
+            <div class="card-body">
+                {% if allocations.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">Foto</th>
+                                <th>Produto</th>
+                                <th>Obra</th>
+                                <th>Quantidade</th>
+                                <th>Status</th>
+                                <th>Data Solicitação</th>
+                                <th>Aprovado Por</th>
+                                <th>Observações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for allocation in allocations.items %}
+                            <tr>
+                                <td>
+                                    {% if allocation.product.photo_filename %}
+                                        <img src="{{ url_for('uploaded_file', filename=allocation.product.photo_filename) }}" 
+                                             alt="Foto do produto" 
+                                             class="img-thumbnail product-photo" 
+                                             style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;"
+                                             onclick="showProductPhoto('{{ allocation.product.photo_filename }}', '{{ allocation.product.code }}', '{{ allocation.product.name }}')"
+                                             title="Clique para ampliar">
+                                    {% else %}
+                                        <div class="d-flex align-items-center justify-content-center bg-secondary text-white rounded" 
+                                             style="width: 50px; height: 50px;">
+                                            <i class="fas fa-box"></i>
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ allocation.product.code }}</strong><br>
+                                    <span class="text-muted">{{ allocation.product.name }}</span><br>
+                                    <small class="text-muted">{{ allocation.product.supplier_name }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ allocation.work_number }}</span>
+                                </td>
+                                <td>{{ allocation.quantity }} {{ allocation.product.unit }}</td>
+                                <td>
+                                    {% if allocation.status == 'pending' %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-clock"></i> Pendente
+                                        </span>
+                                    {% elif allocation.status == 'approved' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> Aprovada
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i> Rejeitada
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ allocation.allocated_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>
+                                    {% if allocation.approved_by %}
+                                        <small>{{ allocation.approved_by.username }}</small><br>
+                                        <small class="text-muted">{{ allocation.approved_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if allocation.notes %}
+                                        <small data-bs-toggle="tooltip" title="{{ allocation.notes }}">
+                                            {{ allocation.notes[:30] }}{% if allocation.notes|length > 30 %}...{% endif %}
+                                        </small>
+                                    {% endif %}
+                                    {% if allocation.approval_notes %}
+                                        <br><small class="text-info" data-bs-toggle="tooltip" title="{{ allocation.approval_notes }}">
+                                            <i class="fas fa-comment"></i> {{ allocation.approval_notes[:20] }}{% if allocation.approval_notes|length > 20 %}...{% endif %}
+                                        </small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                {% if allocations.pages > 1 %}
+                <nav aria-label="Navegação de páginas" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if allocations.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('my_requests', page=allocations.prev_num) }}">Anterior</a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in allocations.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                            {% if page_num %}
+                                {% if page_num != allocations.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('my_requests', page=page_num) }}">{{ page_num }}</a>
+                                </li>
+                                {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">…</span>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if allocations.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('my_requests', page=allocations.next_num) }}">Próximo</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+                
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                    <h5>Nenhuma solicitação encontrada</h5>
+                    <p class="text-muted">Você ainda não fez nenhuma solicitação de produtos.</p>
+                    <a href="{{ url_for('request_product') }}" class="btn btn-primary">
+                        <i class="fas fa-plus-circle"></i> Fazer Primeira Solicitação
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

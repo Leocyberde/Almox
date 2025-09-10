@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Gerenciar Produtos - Sistema de Controle de Estoque{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-cog"></i> Gerenciar Produtos</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Gerenciar Produtos</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <a href="{{ url_for('add_product') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Adicionar Produto
+        </a>
+    </div>
+    <div class="col-md-6">
+        <form method="GET" class="d-flex">
+            <input type="text" name="search" class="form-control" placeholder="Buscar produtos..." value="{{ search }}">
+            <button type="submit" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-search"></i>
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5><i class="fas fa-list"></i> Lista de Produtos</h5>
+    </div>
+    <div class="card-body">
+        {% if products.items %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Foto</th>
+                        <th>Código</th>
+                        <th>Nome</th>
+                        <th>Local</th>
+                        <th>Quantidade</th>
+                        <th>Fornecedor</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products.items %}
+                    <tr>
+                        <td>
+                            {% if product.photo_filename %}
+                                <img src="{{ url_for('uploaded_file', filename=product.photo_filename) }}" 
+                                     alt="Foto" class="img-thumbnail product-photo" 
+                                     style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;"
+                                     onclick="showProductPhoto('{{ product.photo_filename }}', '{{ product.code }}', '{{ product.name }}')"
+                                     title="Clique para ampliar">
+                            {% else %}
+                                <div class="bg-secondary d-flex align-items-center justify-content-center" 
+                                     style="width: 50px; height: 50px;">
+                                    <i class="fas fa-image text-white"></i>
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ product.code }}</strong></td>
+                        <td>{{ product.name }}</td>
+                        <td>{{ product.location }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'warning' if product.quantity <= 10 else 'success' }}">
+                                {{ product.quantity|int }} {{ product.unit }}
+                            </span>
+                        </td>
+                        <td>{{ product.supplier_name }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('edit_product', product_id=product.id) }}" 
+                                   class="btn btn-outline-primary" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                
+                                <button type="button" class="btn btn-outline-info" 
+                                        data-bs-toggle="modal" data-bs-target="#stockModal{{ product.id }}" title="Ajustar Estoque">
+                                    <i class="fas fa-plus-minus"></i>
+                                </button>
+                                
+                                {% if current_user.is_admin %}
+                                <form method="POST" action="{{ url_for('delete_product', product_id=product.id) }}" 
+                                      style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este produto?')">
+                                    <button type="submit" class="btn btn-outline-danger" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Stock Adjustment Modal -->
+                    <div class="modal fade" id="stockModal{{ product.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Ajustar Estoque - {{ product.name }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('adjust_stock', product_id=product.id) }}">
+                                    {{ form.hidden_tag() }}
+                                    <div class="modal-body">
+                                        <p><strong>Estoque atual:</strong> {{ product.quantity|int }} {{ product.unit }}</p>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Tipo de Ajuste</label>
+                                            <select name="adjustment_type" class="form-control" required>
+                                                <option value="add">Adicionar Estoque</option>
+                                                <option value="remove">Remover Estoque</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Quantidade</label>
+                                            <input type="number" name="quantity" class="form-control" step="0.01" min="0.01" required>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Observações</label>
+                                            <textarea name="notes" class="form-control" rows="3" required></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Aplicar Ajuste</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if products.pages > 1 %}
+        <nav aria-label="Navegação de páginas">
+            <ul class="pagination justify-content-center">
+                {% if products.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('manage_products', page=products.prev_num, search=search) }}">Anterior</a>
+                    </li>
+                {% endif %}
+                
+                {% for page_num in products.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != products.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('manage_products', page=page_num, search=search) }}">{{ page_num }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if products.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('manage_products', page=products.next_num, search=search) }}">Próximo</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+            <h5>Nenhum produto encontrado</h5>
+            <p class="text-muted">{% if search %}Tente uma busca diferente ou {% endif %}<a href="{{ url_for('add_product') }}">adicione o primeiro produto</a>.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

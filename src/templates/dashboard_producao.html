@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Produção - Sistema de Controle de Estoque{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-industry"></i> Dashboard - Produção</h2>
+        <p class="text-muted">Bem-vindo, {{ current_user.username }}!</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>Total Solicitações</h5>
+                        <h2>{{ total_requests }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-file-alt fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>Pendentes</h5>
+                        <h2>{{ pending_requests }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>Aprovadas</h5>
+                        <h2>{{ approved_requests }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>Rejeitadas</h5>
+                        <h2>{{ rejected_requests }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-times fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-plus"></i> Ações Disponíveis</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('request_product') }}" class="btn btn-primary">
+                        <i class="fas fa-plus-circle"></i> Solicitar Produto
+                    </a>
+                    <a href="{{ url_for('my_requests') }}" class="btn btn-warning">
+                        <i class="fas fa-list"></i> Minhas Solicitações
+                    </a>
+                    <a href="{{ url_for('inventory') }}" class="btn btn-info">
+                        <i class="fas fa-warehouse"></i> Consultar Estoque
+                    </a>
+                    <a href="{{ url_for('allocation_history') }}" class="btn btn-success">
+                        <i class="fas fa-history"></i> Histórico Aprovado
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> Minhas Solicitações Recentes</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_allocations %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Obra</th>
+                                <th>Qtd</th>
+                                <th>Status</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for allocation in recent_allocations %}
+                            <tr>
+                                <td>{{ allocation.product.name[:20] }}...</td>
+                                <td>{{ allocation.work_number }}</td>
+                                <td>{{ allocation.quantity }} {{ allocation.product.unit }}</td>
+                                <td>
+                                    {% if allocation.status == 'pending' %}
+                                        <span class="badge bg-warning">Pendente</span>
+                                    {% elif allocation.status == 'approved' %}
+                                        <span class="badge bg-success">Aprovada</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Rejeitada</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ allocation.allocated_at.strftime('%d/%m %H:%M') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center">
+                    <a href="{{ url_for('my_requests') }}" class="btn btn-sm btn-outline-primary">
+                        Ver Todas
+                    </a>
+                </div>
+                {% else %}
+                <p class="text-muted text-center">Você ainda não fez nenhuma solicitação.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

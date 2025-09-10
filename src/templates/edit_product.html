@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Produto - Sistema de Controle de Estoque{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-edit"></i> Editar Produto</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('manage_products') }}">Produtos</a></li>
+                <li class="breadcrumb-item active">Editar {{ product.code }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-box"></i> Informações do Produto</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.code.label(class="form-label") }}
+                            {{ form.code(class="form-control" + (" is-invalid" if form.code.errors else "")) }}
+                            {% if form.code.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.code.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            {{ form.supplier_reference.label(class="form-label") }}
+                            {{ form.supplier_reference(class="form-control" + (" is-invalid" if form.supplier_reference.errors else "")) }}
+                            {% if form.supplier_reference.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.supplier_reference.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "")) }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.name.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.location.label(class="form-label") }}
+                            {{ form.location(class="form-control" + (" is-invalid" if form.location.errors else "")) }}
+                            {% if form.location.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.location.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            {{ form.supplier_name.label(class="form-label") }}
+                            {{ form.supplier_name(class="form-control" + (" is-invalid" if form.supplier_name.errors else "")) }}
+                            {% if form.supplier_name.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.supplier_name.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.unit.label(class="form-label") }}
+                        {{ form.unit(class="form-control" + (" is-invalid" if form.unit.errors else "")) }}
+                        {% if form.unit.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.unit.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">Nota: A quantidade não pode ser alterada aqui. Use o botão "Ajustar Estoque" na listagem de produtos.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.photo.label(class="form-label") }}
+                        {{ form.photo(class="form-control" + (" is-invalid" if form.photo.errors else "")) }}
+                        {% if form.photo.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.photo.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">Deixe em branco para manter a foto atual. Formatos aceitos: JPG, JPEG, PNG, GIF.</div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Salvar Alterações
+                        </button>
+                        <a href="{{ url_for('manage_products') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Informações Atuais</h5>
+            </div>
+            <div class="card-body">
+                {% if product.photo_filename %}
+                <div class="text-center mb-3">
+                    <img src="{{ url_for('uploaded_file', filename=product.photo_filename) }}" 
+                         alt="Foto atual" class="img-fluid rounded product-photo" 
+                         style="max-height: 200px; cursor: pointer;"
+                         onclick="showProductPhoto('{{ product.photo_filename }}', '{{ product.code }}', '{{ product.name }}')"
+                         title="Clique para ampliar">
+                </div>
+                {% endif %}
+                
+                <p><strong>Quantidade atual:</strong> {{ product.quantity|int }} {{ product.unit }}</p>
+                <p><strong>Criado em:</strong> {{ product.created_at.strftime('%d/%m/%Y') }}</p>
+                <p><strong>Última atualização:</strong> {{ product.updated_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                
+                <hr>
+                <p class="text-muted small">
+                    Para ajustar a quantidade em estoque, use a função "Ajustar Estoque" na página de gerenciamento de produtos.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
