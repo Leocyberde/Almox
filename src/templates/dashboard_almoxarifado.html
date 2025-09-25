@@ -98,6 +98,9 @@
                     <a href="{{ url_for('manage_products') }}" class="btn btn-info">
                         <i class="fas fa-cog"></i> Gerenciar Produtos
                     </a>
+                    <a href="{{ url_for('manage_works') }}" class="btn btn-outline-dark">
+                        <i class="fas fa-hard-hat"></i> Gerenciar Obras
+                    </a>
                     {% if current_user.is_admin %}
                     <a href="{{ url_for('manage_employees') }}" class="btn btn-warning">
                         <i class="fas fa-users"></i> Gerenciar Funcionários

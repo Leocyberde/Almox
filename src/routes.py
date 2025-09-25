@@ -280,7 +280,7 @@ def adjust_stock(product_id):
             current_user, 
             form.adjustment_type.data, 
             form.quantity.data, 
-            form.notes.data
+            form.notes.data or ""
         )
         db.session.commit()
         
@@ -291,6 +291,78 @@ def adjust_stock(product_id):
                 flash(f'{field}: {error}', 'danger')
     
     return redirect(url_for('manage_products'))
+
+# Work management routes
+@app.route('/works/manage')
+@login_required
+def manage_works():
+    # Allow both almoxarifado and producao users to view works
+    pass
+    
+    # Get all allocations grouped by work_number
+    from sqlalchemy import func
+    
+    # Get work numbers with statistics
+    works_query = db.session.query(
+        Allocation.work_number,
+        func.count(Allocation.id).label('total_allocations'),
+        func.count(func.distinct(Allocation.product_id)).label('unique_products'),
+        func.sum(Allocation.quantity).label('total_quantity'),
+        func.max(Allocation.allocated_at).label('last_allocation')
+    ).filter(
+        Allocation.status == 'approved'
+    ).group_by(Allocation.work_number).order_by(
+        func.max(Allocation.allocated_at).desc()
+    ).all()
+    
+    # Get search parameter
+    search = request.args.get('search', '', type=str)
+    if search:
+        works_query = db.session.query(
+            Allocation.work_number,
+            func.count(Allocation.id).label('total_allocations'),
+            func.count(func.distinct(Allocation.product_id)).label('unique_products'),
+            func.sum(Allocation.quantity).label('total_quantity'),
+            func.max(Allocation.allocated_at).label('last_allocation')
+        ).filter(
+            Allocation.status == 'approved',
+            Allocation.work_number.contains(search)
+        ).group_by(Allocation.work_number).order_by(
+            func.max(Allocation.allocated_at).desc()
+        ).all()
+    
+    return render_template('manage_works.html', works=works_query, search=search)
+
+@app.route('/works/<work_number>/details')
+@login_required
+def work_details(work_number):
+    # Allow both almoxarifado and producao users to view work details
+    pass
+    
+    # Get all allocations for this work
+    allocations = Allocation.query.filter_by(
+        work_number=work_number, 
+        status='approved'
+    ).order_by(Allocation.allocated_at.desc()).all()
+    
+    if not allocations:
+        flash('Obra não encontrada.', 'danger')
+        return redirect(url_for('manage_works'))
+    
+    # Calculate totals
+    from sqlalchemy import func
+    stats = db.session.query(
+        func.count(Allocation.id).label('total_allocations'),
+        func.count(func.distinct(Allocation.product_id)).label('unique_products'),
+        func.sum(Allocation.quantity).label('total_quantity'),
+        func.min(Allocation.allocated_at).label('first_allocation'),
+        func.max(Allocation.allocated_at).label('last_allocation')
+    ).filter_by(work_number=work_number, status='approved').first()
+    
+    return render_template('work_details.html', 
+                         work_number=work_number, 
+                         allocations=allocations, 
+                         stats=stats)
 
 # Employee management routes
 @app.route('/employees/manage')
@@ -405,18 +477,28 @@ def delete_employee(user_id):
 def allocate_product():
     # Use different forms for different roles
     if current_user.role == 'producao':
-        return redirect(url_for('request_product'))
+        # Pass the product_id parameter to request_product for pre-selection
+        product_id = request.args.get('product_id', type=int)
+        if product_id:
+            return redirect(url_for('request_product', product_id=product_id))
+        else:
+            return redirect(url_for('request_product'))
     
     form = AllocationForm()
     
     # Pre-select product if product_id is provided in URL
     product_id = request.args.get('product_id', type=int)
+    work_number = request.args.get('work_number', type=str)
     selected_product = None
+    
     if product_id:
         selected_product = Product.query.get(product_id)
         if selected_product:
             form.product_search.data = f"{selected_product.code} - {selected_product.name}"
             form.product_id.data = str(selected_product.id)
+    
+    if work_number:
+        form.work_number.data = work_number
     
     if form.validate_on_submit():
         product = Product.query.get_or_404(form.product_id.data)
@@ -468,10 +550,22 @@ def request_product():
     product_id = request.args.get('product_id', type=int)
     selected_product = None
     if product_id:
-        selected_product = Product.query.get(product_id)
-        if selected_product:
-            form.product_search.data = f"{selected_product.code} - {selected_product.name}"
-            form.product_id.data = str(selected_product.id)
+        product = Product.query.get(product_id)
+        if product:
+            form.product_search.data = f"{product.code} - {product.name}"
+            form.product_id.data = str(product.id)
+            # Convert to dictionary for JSON serialization
+            selected_product = {
+                'id': product.id,
+                'code': product.code,
+                'name': product.name,
+                'supplier_reference': product.supplier_reference,
+                'supplier_name': product.supplier_name,
+                'location': product.location,
+                'quantity': product.quantity,
+                'unit': product.unit,
+                'photo_filename': product.photo_filename
+            }
     
     if form.validate_on_submit():
         product = Product.query.get_or_404(form.product_id.data)

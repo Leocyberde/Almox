@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}Gerenciar Obras - Sistema de Controle de Estoque{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-hard-hat"></i> Gerenciar Obras</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Gerenciar Obras</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-8">
+        <form method="GET" class="d-flex">
+            <input type="text" name="search" class="form-control"
+                   placeholder="Buscar por número da obra..."
+                   value="{{ search }}">
+            <button type="submit" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-search"></i>
+            </button>
+            {% if search %}
+            <a href="{{ url_for('manage_works') }}" class="btn btn-outline-danger ms-2" title="Limpar busca">
+                <i class="fas fa-times"></i>
+            </a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="col-md-4 text-end">
+        <div class="dropdown">
+            <button class="btn btn-info dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-download"></i> Relatórios
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" onclick="exportWorksToCSV()">
+                    <i class="fas fa-file-csv"></i> Exportar CSV
+                </a></li>
+                <li><a class="dropdown-item" href="#" onclick="printWorksSummary()">
+                    <i class="fas fa-print"></i> Imprimir Resumo
+                </a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5><i class="fas fa-list"></i>
+            {% if search %}
+                Resultados da busca "{{ search }}"
+            {% else %}
+                Todas as Obras
+            {% endif %}
+        </h5>
+        <small class="text-muted">
+            Total: {{ works|length }} obra{{ 's' if works|length != 1 else '' }}
+        </small>
+    </div>
+    <div class="card-body">
+        {% if works %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Número da Obra</th>
+                        <th>Total de Alocações</th>
+                        <th>Produtos Únicos</th>
+                        <th>Quantidade Total</th>
+                        <th>Última Alocação</th>
+                        <th width="120">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for work in works %}
+                    <tr>
+                        <td>
+                            <span class="badge bg-primary fs-6">
+                                Obra {{ work.work_number }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">
+                                {{ work.total_allocations }} alocação{{ 'ões' if work.total_allocations != 1 else '' }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-success">
+                                {{ work.unique_products }} produto{{ 's' if work.unique_products != 1 else '' }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-warning text-dark">
+                                {{ work.total_quantity|int }} unidades
+                            </span>
+                        </td>
+                        <td>
+                            <div class="small">
+                                <strong>{{ work.last_allocation.strftime('%d/%m/%Y') }}</strong><br>
+                                <span class="text-muted">{{ work.last_allocation.strftime('%H:%M') }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('work_details', work_number=work.work_number) }}"
+                                   class="btn btn-outline-primary" title="Ver detalhes">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-success"
+                                        onclick="generateWorkReport('{{ work.work_number }}')"
+                                        title="Gerar relatório">
+                                    <i class="fas fa-file-alt"></i>
+                                </button>
+                                
+                                {% if current_user.role == 'almoxarifado' %}
+        <a href="{{ url_for('allocate_product') }}?work_number={{ work.work_number }}" 
+           class="btn btn-sm btn-primary" title="Nova Alocação">
+            <i class="fas fa-plus"></i>
+        </a>
+        {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-hard-hat fa-3x text-muted mb-3"></i>
+            <h5>
+                {% if search %}
+                    Nenhuma obra encontrada
+                {% else %}
+                    Nenhuma obra cadastrada
+                {% endif %}
+            </h5>
+            <p class="text-muted">
+                {% if search %}
+                    Tente ajustar os termos da busca ou <a href="{{ url_for('manage_works') }}">ver todas as obras</a>.
+                {% else %}
+                    As obras aparecerão aqui quando houver alocações aprovadas.
+                {% endif %}
+            </p>
+            {% if not search %}
+            <a href="{{ url_for('allocate_product') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Fazer Primeira Alocação
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Summary Statistics -->
+{% if works %}
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h4>{{ works|length }}</h4>
+                <small>Obras Ativas</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ works|sum(attribute='total_allocations') }}</h4>
+                <small>Total de Alocações</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h4>{{ works|sum(attribute='unique_products') }}</h4>
+                <small>Produtos Alocados</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h4>{{ works|sum(attribute='total_quantity')|int }}</h4>
+                <small>Unidades Totais</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function generateWorkReport(workNumber) {
+    // Open work details in new tab
+    window.open(`{{ url_for('work_details', work_number='WORK_NUMBER') }}`.replace('WORK_NUMBER', workNumber), '_blank');
+}
+
+function exportWorksToCSV() {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Obra,Total Alocações,Produtos Únicos,Quantidade Total,Última Alocação\n";
+
+    const rows = document.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 5) {
+            const workNumber = cells[0].textContent.trim().replace('Obra ', '');
+            const totalAllocations = cells[1].textContent.trim().split(' ')[0];
+            const uniqueProducts = cells[2].textContent.trim().split(' ')[0];
+            const totalQuantity = cells[3].textContent.trim().split(' ')[0];
+            const lastAllocation = cells[4].textContent.trim().replace('\n', ' ');
+
+            csvContent += `${workNumber},${totalAllocations},${uniqueProducts},${totalQuantity},"${lastAllocation}"\n`;
+        }
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "obras_resumo.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function printWorksSummary() {
+    window.print();
+}
+
+// Search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.querySelector('input[name="search"]');
+    if (searchInput) {
+        searchInput.focus();
+    }
+});
+</script>
+{% endblock %}

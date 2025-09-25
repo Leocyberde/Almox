@@ -1,0 +1,332 @@
+
+{% extends "base.html" %}
+
+{% block title %}Obra {{ work_number }} - Sistema de Controle de Estoque{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-hard-hat"></i> Obra {{ work_number }}</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('manage_works') }}">Gerenciar Obras</a></li>
+                <li class="breadcrumb-item active">Obra {{ work_number }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.total_allocations }}</h4>
+                <small>Alocações</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.unique_products }}</h4>
+                <small>Produtos</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.total_quantity|int }}</h4>
+                <small>Unidades</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h6>Primeira Alocação</h6>
+                <small>{{ stats.first_allocation.strftime('%d/%m/%Y às %H:%M') }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-secondary text-white">
+            <div class="card-body text-center">
+                <h6>Última Alocação</h6>
+                <small>{{ stats.last_allocation.strftime('%d/%m/%Y às %H:%M') }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="row mb-3">
+    <div class="col-md-8">
+        <a href="{{ url_for('manage_works') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar às Obras
+        </a>
+        {% if current_user.role == 'almoxarifado' %}
+        <a href="{{ url_for('allocate_product') }}?work_number={{ work_number }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nova Alocação
+        </a>
+        {% endif %}
+    </div>
+    <div class="col-md-4 text-end">
+        <div class="dropdown">
+            <button class="btn btn-info dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-download"></i> Exportar
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" onclick="exportWorkToCSV()">
+                    <i class="fas fa-file-csv"></i> Exportar CSV
+                </a></li>
+                <li><a class="dropdown-item" href="#" onclick="printWorkDetails()">
+                    <i class="fas fa-print"></i> Imprimir Relatório
+                </a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Allocations Table -->
+<div class="card">
+    <div class="card-header">
+        <h5><i class="fas fa-list"></i> Produtos Alocados</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th width="80">Foto</th>
+                        <th>Produto</th>
+                        <th>Código</th>
+                        <th>Quantidade</th>
+                        <th>Data/Hora</th>
+                        <th>Usuário</th>
+                        <th>Observações</th>
+                        <th width="100">Detalhes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for allocation in allocations %}
+                    <tr>
+                        <td>
+                            {% if allocation.product.photo_filename %}
+                                <img src="{{ url_for('uploaded_file', filename=allocation.product.photo_filename) }}"
+                                     alt="Foto do produto" class="img-thumbnail product-photo"
+                                     style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;"
+                                     onclick="showProductPhoto('{{ allocation.product.photo_filename }}', '{{ allocation.product.code }}', '{{ allocation.product.name }}')"
+                                     title="Clique para ampliar">
+                            {% else %}
+                                <div class="bg-secondary d-flex align-items-center justify-content-center rounded"
+                                     style="width: 60px; height: 60px;">
+                                    <i class="fas fa-image text-white"></i>
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div>
+                                <strong>{{ allocation.product.name }}</strong><br>
+                                <small class="text-muted">
+                                    <i class="fas fa-map-marker-alt"></i> {{ allocation.product.location }}
+                                </small>
+                            </div>
+                        </td>
+                        <td>
+                            <strong class="text-primary">{{ allocation.product.code }}</strong>
+                            {% if allocation.product.supplier_reference %}
+                                <br><small class="text-muted">{{ allocation.product.supplier_reference }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-success fs-6">
+                                {{ allocation.quantity|round(2) }} {{ allocation.product.unit }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="small">
+                                <strong>{{ allocation.allocated_at.strftime('%d/%m/%Y') }}</strong><br>
+                                <span class="text-muted">{{ allocation.allocated_at.strftime('%H:%M:%S') }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-user text-muted me-2"></i>
+                                <div>
+                                    <strong>{{ allocation.user.username }}</strong><br>
+                                    <small class="text-muted">{{ allocation.user.role|title }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if allocation.notes %}
+                                <span class="text-truncate d-inline-block" style="max-width: 150px;" title="{{ allocation.notes }}">
+                                    {{ allocation.notes }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-outline-info btn-sm" 
+                                    data-bs-toggle="modal" data-bs-target="#allocationModal{{ allocation.id }}"
+                                    title="Ver detalhes completos">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    
+                    <!-- Allocation Details Modal -->
+                    <div class="modal fade" id="allocationModal{{ allocation.id }}" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">
+                                        <i class="fas fa-info-circle"></i> Detalhes da Alocação
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6><i class="fas fa-share text-primary"></i> Informações da Alocação</h6>
+                                            <table class="table table-sm">
+                                                <tr>
+                                                    <td><strong>Data/Hora:</strong></td>
+                                                    <td>{{ allocation.allocated_at.strftime('%d/%m/%Y às %H:%M:%S') }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Obra:</strong></td>
+                                                    <td><span class="badge bg-info">{{ allocation.work_number }}</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Quantidade:</strong></td>
+                                                    <td><span class="badge bg-success">{{ allocation.quantity|round(2) }} {{ allocation.product.unit }}</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Usuário:</strong></td>
+                                                    <td>{{ allocation.user.username }} <span class="badge bg-secondary ms-1">{{ allocation.user.role|title }}</span></td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6><i class="fas fa-box text-success"></i> Informações do Produto</h6>
+                                            <table class="table table-sm">
+                                                <tr>
+                                                    <td><strong>Código:</strong></td>
+                                                    <td><code>{{ allocation.product.code }}</code></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Nome:</strong></td>
+                                                    <td>{{ allocation.product.name }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Referência:</strong></td>
+                                                    <td>
+                                                        {% if allocation.product.supplier_reference %}
+                                                            <code>{{ allocation.product.supplier_reference }}</code>
+                                                        {% else %}
+                                                            <span class="text-muted">-</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Local:</strong></td>
+                                                    <td><i class="fas fa-map-marker-alt"></i> {{ allocation.product.location }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Fornecedor:</strong></td>
+                                                    <td><span class="badge bg-info">{{ allocation.product.supplier_name }}</span></td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    
+                                    {% if allocation.notes %}
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <h6><i class="fas fa-sticky-note text-warning"></i> Observações</h6>
+                                            <div class="alert alert-light">{{ allocation.notes }}</div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if allocation.product.photo_filename %}
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <h6><i class="fas fa-camera text-info"></i> Foto do Produto</h6>
+                                            <div class="text-center">
+                                                <img src="/static/uploads/{{ allocation.product.photo_filename }}" 
+                                                     alt="Foto do produto {{ allocation.product.name }}" 
+                                                     class="img-fluid rounded border product-photo" 
+                                                     style="max-height: 300px; max-width: 100%; cursor: pointer;"
+                                                     onclick="showProductPhoto('{{ allocation.product.photo_filename }}', '{{ allocation.product.code }}', '{{ allocation.product.name }}')"
+                                                     title="Clique para ampliar">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function exportWorkToCSV() {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Produto,Código,Referência,Quantidade,Unidade,Data,Hora,Usuário,Observações\n";
+    
+    const rows = document.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 7) {
+            const product = cells[1].querySelector('strong').textContent;
+            const code = cells[2].querySelector('strong').textContent;
+            const reference = cells[2].querySelector('small') ? cells[2].querySelector('small').textContent : '';
+            const quantity = cells[3].textContent.trim().split(' ')[0];
+            const unit = cells[3].textContent.trim().split(' ')[1] || '';
+            const date = cells[4].querySelector('strong').textContent;
+            const time = cells[4].querySelector('.text-muted').textContent;
+            const user = cells[5].querySelector('strong').textContent;
+            const notes = cells[6].textContent.trim() === '-' ? '' : cells[6].textContent.trim();
+            
+            csvContent += `"${product}","${code}","${reference}","${quantity}","${unit}","${date}","${time}","${user}","${notes}"\n`;
+        }
+    });
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `obra_${document.querySelector('h2').textContent.replace('Obra ', '').trim()}_detalhes.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function printWorkDetails() {
+    window.print();
+}
+
+// Initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}
